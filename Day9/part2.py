@@ -28,7 +28,7 @@ with open('bigInput.txt') as fin:
 
 			for j in range(1, len(rope)):
 				# Can't quite figure out why we don't run into an issue with the first input
-				# But the stipulation that it always runs horizontally to keep up is important
+				# But the stipulation that it always runs diagonally to keep up is important
 				if getDist(rope[j-1], rope[j]) >= 2:
 					# This is vector related, but I can't quite figure out the math
 					horizontalMovement = rope[j-1][0] - rope[j][0]
