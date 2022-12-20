@@ -18,7 +18,25 @@ setBounds(source)
 
 cavePathPoints = set()
 
-with open('bigInput.txt') as fin:
+# We need to make some general observations about how the sand piles up
+# If we observe the visualization for our sample input, we can see that the sand forms an inverse
+# triangle under any rock overhangs
+
+# Let's make some test input of our own to see how it deals with enclosed spaces
+
+# Other observations:
+# - The one point gap in the large input doesn't seem to affect the shape of the triangle under an overhang
+# - Enclosed spaces cut the inverted triangle in half
+# - Upward spikes don't seem to affect things
+
+# Can we create a giant triangle of sand and simply subtract sand from the overhangs?
+# We need to 1) find all overhangs, 2) "fill" any gaps, and 3) detect enclosed areas
+
+
+# If we store lines as lines, they'll be easier to use later
+verticalCaveRanges = set()
+horizontalCaveRanges = set()
+with open('input.txt') as fin:
 	for l in fin:
 		lines = [x.strip() for x in l.split('->')]
 		for i in range(len(lines)-1):
@@ -37,12 +55,14 @@ with open('bigInput.txt') as fin:
 				startPoint = (fromX, fromY)
 				endPoint = (toX, toY)
 
-			if fromX == toX:
+			if fromX == toX:  # Vertical line
 				for j in range(startPoint[1], endPoint[1]+1):  # Range is non-inclusive of end
 					cavePathPoints.add((fromX, j))
-			else:
+				verticalCaveRanges.add((startPoint, endPoint))
+			else:  # Horizontal line
 				for j in range(startPoint[0], endPoint[0]+1):
 					cavePathPoints.add((j, fromY))
+				horizontalCaveRanges.add((startPoint, endPoint))
 
 
 
@@ -72,49 +92,40 @@ done = False
 grainCount = 0
 grainPoints = set()
 
-# We need a more efficient way to simulate this
-# Let's use our render function to make some observations about how this works
-# The end result is roughly a triangle with the source as its tip
-# Blank spots appear when there is more than one unit of overhang above some sand
-# Does this hold true enough for us to simply build the triangle from the ground up?
-# It'll be hard to tell until we try, so let's give it a bit of thought
-# I think the thought is that sand will always be able to pile below an overhange IF it has more than one block of space to tumble down
-# Let's use our original code real quick and see if we can't simulate some of our output and test this
+for i in range(source[1], maxY):
+	# Fill in our triangle completely
+	midX = source[0]  # The central X coordinate that all lines will extend from
+	grainPoints = grainPoints.union((x, i) for x in range(midX-i, midX+i+1))  # Source is at y=0, so this works
 
-# Hmm, looking at our test output, we run into some interesting cases that don't fit quite so neatly, especially with enclosed spaces
-# Let's try to just make our original code more efficient
+# Now, let's find all of our overhangs
+# That is, any continuous line >= 2 units long
 
+# First, let's combine all horizontal ranges that have 1 point gaps
+# We can do this by simply combining any range that has a start point that is 1 unit away from the end point of another range
+while True:
+	changed = False
+	for firstRange in horizontalCaveRanges:
+		for secondRange in horizontalCaveRanges:
+			if firstRange == secondRange:
+				continue
 
-grainPos = lastImpact = source
-impacted = False
-while not done:
-	grainPos = (lastImpact[0], lastImpact[1]-1) # Save the last place we hit, then continue calculating from there
-	impacted = False
-	# renderCave()
-	while not done:
-		if grainPos[1]+1 >= maxY:
-			grainCount += 1
-			grainPoints.add(grainPos)
+			if firstRange[0][0] == r2[1][0]+2:  # Compare r's start point to r2's end point + 2
+				# Combine them
+				newRange = ((r2[0][0], r[0][1]), (r[1][0], r[1][1]))
+				horizontalCaveRanges.remove(r)
+				horizontalCaveRanges.remove(r2)
+				horizontalCaveRanges.add(newRange)
+				changed = True
+				break
+
+		if changed:
 			break
 
-		if ((grainPos[0], grainPos[1]+1) in cavePathPoints.union(grainPoints) or grainPos[1]+1 >= maxY) and not impacted:
-			lastImpact = grainPos
-			impacted = True
+	if not changed:
+		break
 
-		if (grainPos[0], grainPos[1]+1) not in cavePathPoints.union(grainPoints):  # Fall down
-			grainPos = (grainPos[0], grainPos[1]+1)
-		elif (grainPos[0]-1, grainPos[1]+1) not in cavePathPoints.union(grainPoints): # Fall to the left
-			grainPos = (grainPos[0]-1, grainPos[1]+1)
-		elif (grainPos[0]+1, grainPos[1]+1) not in cavePathPoints.union(grainPoints):  # Fall to the right
-			grainPos = (grainPos[0]+1, grainPos[1]+1)
-		else:
-			grainCount += 1
-			grainPoints.add(grainPos)
-			break
-
-	setBounds(grainPos)
-	if grainPos == source:
-		done = True
+setBounds(max(grainPoints, key=lambda p: p[0]))
+setBounds(min(grainPoints, key=lambda p: p[0]))
 
 renderCave()
 print(grainCount)
